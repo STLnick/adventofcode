@@ -1,0 +1,6 @@
+London to Dublin = 464
+London to Belfast = 518
+London to XYZ = 100
+Dublin to Belfast = 141
+Dublin to XYZ = 125
+XYZ to Belfast = 50
