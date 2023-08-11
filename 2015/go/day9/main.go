@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 /*
@@ -58,22 +59,35 @@ func removeKey(s []string, target string) []string {
     return res
 }
 
-func findSolution(solutions *[]int, dm DistanceMap, current string, remaining []string, sum int, indent int) {
-    indentStr := strings.Repeat("\t", indent)
-
-    fmt.Printf("%s[ %s ]\n", indentStr, current)
+func findSolution(solutions *[]int, dm DistanceMap, current string, remaining []string, sum int) {
+    if loopLogging {
+        fmt.Printf("[ %s ]\n", current)
+    }
 
     if len(remaining) == 0 {
-        fmt.Printf("%s+++ Possible Solution: %v\n", indentStr, sum)
+        if loopLogging {
+            fmt.Printf("+++ Possible Solution: %v\n", sum)
+        }
         *solutions = append(*solutions, sum)
         return;
     }
 
     for _, k := range remaining {
-        fmt.Printf("%s--- Moving from %s ---> to ---> %s = +%v (SUM %v)\n", indentStr, current, k, dm[current][k], sum + dm[current][k])
-        findSolution(solutions, dm, k, removeKey(remaining, k), sum + dm[current][k], indent + 1)
+        k := k
+        if loopLogging {
+            fmt.Printf("--- Moving from %s ---> to ---> %s = +%v (SUM %v)\n", current, k, dm[current][k], sum + dm[current][k])
+        }
+        findSolution(solutions, dm, k, removeKey(remaining, k), sum + dm[current][k])
     }
 }
+
+func findSolutions(dm DistanceMap, current string, remaining []string) []int {
+    var solutions []int
+    findSolution(&solutions, dm, current, removeKey(remaining, current), 0)
+    return solutions
+}
+
+const loopLogging = false
 
 func main() {
 	fmt.Println("-- Day 9 --")
@@ -115,16 +129,35 @@ func main() {
         distanceMap[key2][key1] = val
 	}
 
-    fmt.Println("Keys: ", keys)
-    fmt.Printf("Keys Addr : %p\n\n", &keys)
-
+    useConcurrency := true
     var solutions []int
-    for _, k := range keys {
-        fmt.Println("MAIN LOOP :: Key: ", k)
-        findSolution(&solutions, distanceMap, k, removeKey(keys, k), 0, 0)
+
+    if !useConcurrency {
+        fmt.Println("SYNCHRONOUS RUN")
+        for _, k := range keys {
+            if loopLogging {
+                fmt.Println("MAIN LOOP :: Key: ", k)
+            }
+            findSolution(&solutions, distanceMap, k, removeKey(keys, k), 0)
+        }
+    } else {
+        fmt.Printf("-- Running %v Go Routines\n", len(keys))
+
+        var wg sync.WaitGroup
+        for _, k := range keys {
+            wg.Add(1)
+            go func(key string, keys []string) {
+                data := findSolutions(distanceMap, key, removeKey(keys, key))
+                solutions = append(solutions, data...)
+                wg.Done()
+            }(k, keys)
+        }
+
+        wg.Wait()
     }
 
     var lowest int 
+    var highest int 
     for i, v := range solutions {
         if i == 0 {
             lowest = v
@@ -132,9 +165,13 @@ func main() {
         if v < lowest {
             lowest = v
         }
+        if v > highest {
+            highest = v
+        }
     }
 
-    fmt.Printf("Calculated %v solutions :: Lowest value was %v\n", len(solutions), lowest)
-
+    fmt.Printf("\t***** Calculated %v solutions ***\n", len(solutions))
+    fmt.Printf("\t  ===> Lowest value: %v\n", lowest)
+    fmt.Printf("\t  ===> Highest value: %v\n", highest)
 	fmt.Println("-- END --")
 }
