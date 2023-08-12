@@ -103,4 +103,19 @@ func main() {
     }
 
     fmt.Println("NEXT PW: ", nextPw)
+
+    fmt.Println("And the next one is....")
+
+    nextPw = ""
+    for nextPw == "" {
+        testPw = incrementPassword(testPw)
+        
+        //fmt.Println("Testing -> ", testPw)
+
+        if validatePassword(testPw) {
+            nextPw = testPw
+        }
+    }
+    
+    fmt.Println("NEXT NEXT PW: ", nextPw)
 }
