@@ -17,6 +17,7 @@ type reindeer struct {
     state string
     counter int
     traveled int
+    points int
 }
 
 func (r *reindeer) Print() {
@@ -27,6 +28,7 @@ func (r *reindeer) Print() {
     fmt.Printf("%-10s", r.state)
     fmt.Printf("%-4d", r.counter)
     fmt.Printf("%-8d", r.traveled)
+    fmt.Printf("%-6d", r.points)
     fmt.Printf("\n")
 }
 
@@ -38,6 +40,7 @@ func printLogHead() {
     fmt.Printf("%-10s", "State") 
     fmt.Printf("%-4s", "Ct")
     fmt.Printf("%-8s", "Travel")
+    fmt.Printf("%-6s", "Points")
     fmt.Printf("\n")
 }
 
@@ -94,17 +97,22 @@ func main() {
             state: "FLYING",
             counter: stamina,
             traveled: 0,
+            points: 0,
         }
         reindeerList = append(reindeerList, newReindeer)
 	}
 
     ticks := 0
+    var currentLeadDist int
     for ticks < *limit {
         ticks++
 
         for _, r := range reindeerList {
             if r.state == "FLYING" {
                 r.traveled += r.speed
+                if r.traveled > currentLeadDist {
+                    currentLeadDist = r.traveled
+                }
                 r.counter--
                 if r.counter == 0 {
                     r.state = "RESTING"
@@ -118,10 +126,19 @@ func main() {
                 }
             }
         }
+
+        // Check after everyone has advanced
+        for _, r := range reindeerList {
+            if r.traveled == currentLeadDist {
+                r.points++
+            }
+        }
     }
 
     var winning int
     var winningName string
+    var winningPts int
+    var winningNamePts string
 
     fmt.Println()
     printLogHead()
@@ -131,6 +148,11 @@ func main() {
             winning = r.traveled
             winningName = r.name
         }
+        if r.points > winningPts {
+            winningPts = r.points
+            winningNamePts = r.name
+        }
     }
     fmt.Printf("\n%s traveled the furthest -> %d\n", winningName, winning)
+    fmt.Printf("\n%s had the most points -> %d\n", winningNamePts, winningPts)
 }
