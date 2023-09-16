@@ -27,8 +27,15 @@ func main() {
 	flag.Parse()
 
 	fmt.Println("Input: ", *input)
+    
+    directory, err := os.Getwd()
+	if err != nil {
+		log.Fatal("error reading working directory", err)
+	}
 
-	file, err := os.ReadFile("/Users/nickray/Code/adventofcode/2015/go/day12/" + *input)
+	path := directory + "/" + *input
+
+	file, err := os.ReadFile(path)
 	if err != nil {
 		log.Panic("Error opening file: ", err)
 	}

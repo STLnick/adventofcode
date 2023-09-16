@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Alice would gain 54 happiness units by sitting next to Bob.
@@ -25,21 +26,6 @@ type seatedPerson struct {
 	name    string
 	prevVal int16
 	nextVal int16
-}
-
-func findHighestGain(key *map[string]map[string]int16, seated string, remaining *[]string) string {
-	var n string
-	var max int16
-	valMap := (*key)[seated]
-
-	for i, name := range *remaining {
-		if i == 0 || valMap[name] > max {
-			max = valMap[name]
-			n = name
-		}
-	}
-
-	return n
 }
 
 func buildKeyAndList(instructions *[]instruction) (map[string]map[string]int16, []string) {
@@ -69,7 +55,12 @@ func buildKeyAndList(instructions *[]instruction) (map[string]map[string]int16, 
 }
 
 func getInstructions(fileName string) []instruction {
-	path := "/Users/nickray/Code/adventofcode/2015/go/day13/" + fileName
+    directory, err := os.Getwd()
+	if err != nil {
+		log.Fatal("error reading working directory", err)
+	}
+
+	path := directory + "/" + fileName
 	file, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatal("error reading input file", err)
@@ -118,69 +109,72 @@ func getInstructions(fileName string) []instruction {
 
 func removeName(n string, s *[]string) {
 	i := slices.Index(*s, n)
-	*s = slices.Replace(*s, i, i+1)
+    if i != -1 {
+	    *s = slices.Replace(*s, i, i+1)
+    }
 }
 
 func seatPerson(
 	n string,
-	lastSeated *string,
 	remaining *[]string,
 	seated *[]*seatedPerson,
-	seatsOpen *int,
-	currentSeat *int,
-) {
+) *seatedPerson {
 	newSp := seatedPerson{name: n}
-	*lastSeated = newSp.name
-	removeName(*lastSeated, remaining)
+	removeName(newSp.name, remaining)
 	*seated = append(*seated, &newSp)
-	*seatsOpen--
-	*currentSeat++
+    return (*seated)[len(*seated) - 1]
 }
 
 func calculateChange(seated *[]*seatedPerson) int16 {
 	var change int16
 	for _, sp := range *seated {
+        //fmt.Printf("Prev val: (%d)  ::  Next val: (%d)\n", (*sp).prevVal, (*sp).nextVal)
 		change += (*sp).prevVal + (*sp).nextVal
 	}
+    //fmt.Printf("Calculating change for %d seated people: %d\n", len(*seated), change)
 	return change
 }
 
 func runPossibility(
+	c chan int16,
+	peopleKey *map[string]map[string]int16,
+	seated []*seatedPerson,
+	remaining []string,
 	firstSeating string,
-	peopleKey map[string]map[string]int16,
-	names []string,
-) int16 {
-	seatsOpen := len(names)
-	remaining := make([]string, len(names))
-	copy(remaining, names)
-
+) {
 	var (
-		seated     []*seatedPerson
-		lastSeated string
-		prevSp     *seatedPerson
-		currSp     *seatedPerson
+		prevSp *seatedPerson
+		currSp *seatedPerson
 	)
-	currentSeat := -1
 
-	seatPerson(firstSeating, &lastSeated, &remaining, &seated, &seatsOpen, &currentSeat)
-	currSp = seated[currentSeat]
-
-	for seatsOpen > 0 {
-		n := findHighestGain(&peopleKey, lastSeated, &remaining)
-		seatPerson(n, &lastSeated, &remaining, &seated, &seatsOpen, &currentSeat)
-		prevSp = currSp
-		currSp = seated[currentSeat]
-		prevSp.nextVal = peopleKey[prevSp.name][currSp.name]
-		currSp.prevVal = peopleKey[currSp.name][prevSp.name]
+	if len(seated) > 0 {
+		prevSp = seated[len(seated) - 1]
 	}
-	currSp.nextVal = peopleKey[currSp.name][seated[0].name]
-	seated[0].prevVal = peopleKey[seated[0].name][currSp.name]
 
-    //for _, sp := range seated {
-        //fmt.Println(sp)
-    //}
+	currSp = seatPerson(firstSeating, &remaining, &seated)
 
-	return calculateChange(&seated)
+	if prevSp != nil {
+		prevSp.nextVal = (*peopleKey)[prevSp.name][currSp.name]
+		currSp.prevVal = (*peopleKey)[currSp.name][prevSp.name]
+	}
+
+    if len(remaining) > 0 {
+		lwg := &sync.WaitGroup{}
+		for _, rn := range remaining {
+			lwg.Add(1)
+			go func(name string) {
+				defer lwg.Done()
+				runPossibility(c, peopleKey, seated, remaining, name)
+			}(rn)
+		}
+		lwg.Wait()
+	} else {
+        // Assign values when seating last person
+        currSp.nextVal = (*peopleKey)[currSp.name][seated[0].name]
+        seated[0].prevVal = (*peopleKey)[seated[0].name][currSp.name]
+
+        c <- calculateChange(&seated)
+    }
 }
 
 func main() {
@@ -189,35 +183,39 @@ func main() {
 	input := flag.String("input", "input.txt", "The file to read as input to program")
 	flag.Parse()
 
+	wg := &sync.WaitGroup{}
+	resultChan := make(chan int16)
 	instructions := getInstructions(*input)
 	peopleKey, names := buildKeyAndList(&instructions)
-	var (
-		p       int16
-		highest int16
-	)
+    remaining := make([]string, len(names))
+    copy(remaining, names)
+	var highest int16
 
-    /*
-     * I'm not getting the right answer - highest possibility returned in
-     * current logic's state is 649 (too low).
-     *
-     * I think I need to refactor to run it in a recursive, "try every single
-     * configuration possible" way.
-     *
-     * 1. create a channel that accepts int16 (possible changes)
-     * 2. Run X different threads with each name used as a root node
-     * 3. Each thread will also exhaust every config and post a val to channel
-     * 4. Loop channel values to find highest sent
-     */
-
-	for i, n := range names {
-        fmt.Println("\n- - - - - - - - - - - - - - - - - - - -")
-		if p = runPossibility(n, peopleKey, names); i == 0 || p > highest {
-			highest = p
-		}
-		fmt.Printf("--->  Possibility #%d - %d  <---\n", i+1, p)
+	for _, n := range names {
+		wg.Add(1)
+		
+        go func(name string) {
+            defer wg.Done()
+		    runPossibility(resultChan, &peopleKey, []*seatedPerson{}, remaining, name)
+        }(n)
 	}
 
-    fmt.Println("\n- - - - - - - - - - - - - - - - - - - -")
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+    var vals []int16
+	for val := range resultChan {
+		//fmt.Println("resultChan val: ", val)
+        vals = append(vals, val)
+		if val > highest {
+			highest = val
+		}
+	}
+
+	fmt.Println("\n- - - - - - - - - - - - - - - - - - - -")
 	fmt.Println("Highest possible change value: ", highest)
-    fmt.Println("- - - - - - - - - - - - - - - - - - - -")
+    fmt.Println("Number of values received:", len(vals))
+	fmt.Println("- - - - - - - - - - - - - - - - - - - -")
 }
