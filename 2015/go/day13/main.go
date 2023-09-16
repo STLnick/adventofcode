@@ -11,10 +11,6 @@ import (
 	"sync"
 )
 
-// Alice would gain 54 happiness units by sitting next to Bob.
-//   0          2   3                                     10
-// person / lose/gain / amt / otherPerson
-
 type instruction struct {
 	p1     string
 	action string
@@ -141,7 +137,12 @@ func runPossibility(
 	seated []*seatedPerson,
 	remaining []string,
 	firstSeating string,
+    isFirstRun bool,
 ) {
+    if isFirstRun {
+        fmt.Println("Remaining to begin parent loop:", remaining)
+    }
+
 	var (
 		prevSp *seatedPerson
 		currSp *seatedPerson
@@ -151,7 +152,7 @@ func runPossibility(
 		prevSp = seated[len(seated) - 1]
 	}
 
-	currSp = seatPerson(firstSeating, &remaining, &seated)
+    currSp = seatPerson(firstSeating, &remaining, &seated)
 
 	if prevSp != nil {
 		prevSp.nextVal = (*peopleKey)[prevSp.name][currSp.name]
@@ -160,14 +161,22 @@ func runPossibility(
 
     if len(remaining) > 0 {
 		lwg := &sync.WaitGroup{}
-		for _, rn := range remaining {
+		for i, rn := range remaining {
+            if i == 0 {
+                //fmt.Println("Remaining:", remaining)
+            }
+            tempName := rn
 			lwg.Add(1)
 			go func(name string) {
+                //fmt.Println("runPossibility() :: Name:", name)
 				defer lwg.Done()
-				runPossibility(c, peopleKey, seated, remaining, name)
-			}(rn)
+				runPossibility(c, peopleKey, seated, remaining, name, false)
+			}(tempName)
 		}
-		lwg.Wait()
+        //go func() {
+        //    lwg.Wait()
+        //}()
+        lwg.Wait()
 	} else {
         // Assign values when seating last person
         currSp.nextVal = (*peopleKey)[currSp.name][seated[0].name]
@@ -190,13 +199,23 @@ func main() {
     remaining := make([]string, len(names))
     copy(remaining, names)
 	var highest int16
-
+                
 	for _, n := range names {
 		wg.Add(1)
 		
         go func(name string) {
             defer wg.Done()
-		    runPossibility(resultChan, &peopleKey, []*seatedPerson{}, remaining, name)
+            r := make([]string, len(names))
+            copy(r, remaining)
+            initialSeating := make([]*seatedPerson, 0, len(names) + 1)
+            runPossibility(
+                resultChan,
+                &peopleKey,
+                initialSeating,
+                r,
+                name,
+                true,
+            )
         }(n)
 	}
 
