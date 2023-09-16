@@ -137,12 +137,7 @@ func runPossibility(
 	seated []*seatedPerson,
 	remaining []string,
 	firstSeating string,
-    isFirstRun bool,
 ) {
-    if isFirstRun {
-        fmt.Println("Remaining to begin parent loop:", remaining)
-    }
-
 	var (
 		prevSp *seatedPerson
 		currSp *seatedPerson
@@ -161,28 +156,64 @@ func runPossibility(
 
     if len(remaining) > 0 {
 		lwg := &sync.WaitGroup{}
-		for i, rn := range remaining {
-            if i == 0 {
-                //fmt.Println("Remaining:", remaining)
-            }
-            tempName := rn
+		for _, rn := range remaining {
 			lwg.Add(1)
+            s := make([]*seatedPerson, len(seated), cap(seated))
+            //s := make([]*seatedPerson, 0, cap(seated))
+            copy(s, seated)
+            r := make([]string, len(remaining))
+            copy(r, remaining)
+
 			go func(name string) {
                 //fmt.Println("runPossibility() :: Name:", name)
 				defer lwg.Done()
-				runPossibility(c, peopleKey, seated, remaining, name, false)
-			}(tempName)
+				//runPossibility(c, peopleKey, seated, r, name)
+                
+                // When providing a fresh copy for SEATED getting 0 values back
+				runPossibility(c, peopleKey, s, r, name)
+			}(rn)
 		}
         //go func() {
         //    lwg.Wait()
         //}()
         lwg.Wait()
 	} else {
-        // Assign values when seating last person
         currSp.nextVal = (*peopleKey)[currSp.name][seated[0].name]
         seated[0].prevVal = (*peopleKey)[seated[0].name][currSp.name]
 
         c <- calculateChange(&seated)
+    }
+}
+
+func runPossibilityStr(c chan []string, seated []string, remaining []string, firstSeating string) {
+	seated = append(seated, firstSeating)
+	removeName(firstSeating, &remaining)
+
+    if len(remaining) > 0 {
+		lwg := &sync.WaitGroup{}
+		for _, rn := range remaining {
+			lwg.Add(1)
+
+            s := make([]string, len(seated), cap(seated))
+            copy(s, seated)
+
+            r := make([]string, len(remaining))
+            copy(r, remaining)
+
+			go func(name string) {
+                //fmt.Println("runPossibilityStr() :: Name:", name)
+				defer lwg.Done()
+				runPossibilityStr(c, s, r, name)
+                
+                // When providing a fresh copy for SEATED getting 0 values back
+				//runPossibilityStr(c, peopleKey, s, r, name)
+			}(rn)
+		}
+
+        lwg.Wait()
+	} else {
+        //c <- calculateChange(&seated)
+        c <- seated
     }
 }
 
@@ -194,12 +225,13 @@ func main() {
 
 	wg := &sync.WaitGroup{}
 	resultChan := make(chan int16)
+	//resultChanStr := make(chan []string)
 	instructions := getInstructions(*input)
 	peopleKey, names := buildKeyAndList(&instructions)
     remaining := make([]string, len(names))
     copy(remaining, names)
 	var highest int16
-                
+
 	for _, n := range names {
 		wg.Add(1)
 		
@@ -207,15 +239,20 @@ func main() {
             defer wg.Done()
             r := make([]string, len(names))
             copy(r, remaining)
-            initialSeating := make([]*seatedPerson, 0, len(names) + 1)
+            initialSeating := make([]*seatedPerson, 0, len(names))
+            //initialSeatingStr := make([]string, 0, len(names))
+
             runPossibility(
                 resultChan,
                 &peopleKey,
                 initialSeating,
                 r,
                 name,
-                true,
             )
+
+            // Provide all possible string/seating combinations
+
+            //runPossibilityStr(resultChanStr, initialSeatingStr, r, name)
         }(n)
 	}
 
@@ -223,6 +260,8 @@ func main() {
 		wg.Wait()
 		close(resultChan)
 	}()
+
+    // TODO: Loop All compiled combinations and find hightest value
 
     var vals []int16
 	for val := range resultChan {
