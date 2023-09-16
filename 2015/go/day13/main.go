@@ -97,10 +97,60 @@ func getInstructions(fileName string) []instruction {
 	return instructions
 }
 
-func removeName(n string, s *[]string) {
-	i := slices.Index(*s, n)
+func removeName(s []string, n string) []string {
+    newSlice := copySlice(s)
+	i := slices.Index(newSlice, n)
     if i != -1 {
-	    *s = slices.Replace(*s, i, i+1)
+	    return slices.Replace(newSlice, i, i+1)
+    }
+    return newSlice
+}
+
+func copySlice(s []string) []string {
+    newSlice := make([]string, len(s), cap(s))
+    copy(newSlice, s)
+    return newSlice
+}
+
+func calculateHappiness(peopleKey map[string]map[string]int16, names []string) int16 {
+    var total int16
+
+    for i, name := range names {
+        prevIndex := i-1
+        if prevIndex < 0 {
+            prevIndex = len(names) - 1
+        }
+        total += peopleKey[name][names[prevIndex]]
+
+        nextIndex := i+1
+        if nextIndex == len(names) {
+            nextIndex = 0
+        }
+        total += peopleKey[name][names[nextIndex]]
+    }
+
+    return total
+}
+
+func compileCombination(c chan []string, seated []string, remaining []string, firstSeating string) {
+    newSeated := append(copySlice(seated), firstSeating)
+    newRemaining := removeName(remaining, firstSeating)
+
+    if len(newRemaining) > 0 {
+        lwg := sync.WaitGroup{}
+        for _, rn := range newRemaining {
+            lwg.Add(1)
+            r := copySlice(newRemaining)
+            s := copySlice(newSeated)
+
+            go func(name string) {
+                defer lwg.Done()
+                compileCombination(c, s, r, name)
+            }(rn)
+        }
+        lwg.Wait()
+    } else {
+        c <- newSeated
     }
 }
 
@@ -114,17 +164,20 @@ func main() {
 	resultChanStr := make(chan []string)
 	instructions := getInstructions(*input)
 	peopleKey, names := buildKeyAndList(&instructions)
-    _ = peopleKey // appease compiler for now 
-
-    remaining := make([]string, len(names))
-    copy(remaining, names)
+    remaining := copySlice(names)
 
 	for _, n := range names {
 		wg.Add(1)
+        r := copySlice(remaining)
 		
         go func(name string) {
             defer wg.Done()
-            resultChanStr <- []string{name}
+            compileCombination(
+                resultChanStr,
+                make([]string, 0, len(names)),
+                r,
+                name,
+            )
         }(n)
 	}
 
@@ -133,8 +186,23 @@ func main() {
 		close(resultChanStr)
 	}()
 
-    // TODO: Loop All compiled combinations and find highest value
+    var possibilities [][]string
+    var intVals []int16
+    var highest int16
+    var tempVal int16
+
 	for val := range resultChanStr {
-		fmt.Println("resultChanStr val: ", val)
+        possibilities = append(possibilities, val)
+        tempVal = calculateHappiness(peopleKey, val)
+
+        if tempVal > highest {
+            highest = tempVal
+        }
+        intVals = append(intVals, tempVal)
 	}
+
+    // TODO: Check and ensure `possibilities` is all unique lists
+
+    fmt.Printf("Received %d Values from Channel\n", len(intVals))
+    fmt.Printf("Highest value (%d)\n", highest)
 }
