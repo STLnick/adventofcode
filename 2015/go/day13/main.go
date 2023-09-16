@@ -222,15 +222,11 @@ func main() {
 	instructions := getInstructions(*input)
 	peopleKey, names := buildKeyAndList(&instructions)
 
-	fmt.Println("*** Part 1 *** :: BEGIN")
+	fmt.Println("*** Part 1 ***")
 	partOneVals, highestOne := getPossibleInts(peopleKey, names, false)
-	fmt.Println("Part One Vals len: ", len(partOneVals))
-	fmt.Printf("Highest value (%d)\n", highestOne)
-	fmt.Println("*** Part 1 *** :: END\n")
+    fmt.Printf("# of Results (%d) --- Highest Value (%d)\n", len(partOneVals), highestOne)
 
-	fmt.Println("*** Part 2 *** :: START")
+	fmt.Println("*** Part 2 ***")
 	partTwoVals, highestTwo := getPossibleInts(peopleKey, names, true)
-	fmt.Println("Part Two Vals len: ", len(partTwoVals))
-	fmt.Printf("Highest value (%d)\n\n", highestTwo)
-	fmt.Println("*** Part 2 *** :: END")
+    fmt.Printf("# of Results (%d) --- Highest Value (%d)\n", len(partTwoVals), highestTwo)
 }
