@@ -55,6 +55,29 @@ func compileIngredients(fileName string) []ingredient {
 	return ingredients
 }
 
+func addToTotals(ing ingredient, qty int, capT *int, durT *int, flavT *int, texT *int, calT *int) {
+    *capT += (qty * ing.capacity)
+    *durT += (qty * ing.durability)
+    *flavT += (qty * ing.flavor)
+    *texT += (qty * ing.texture)
+    *calT += (qty * ing.calories)
+}
+
+func clampToZero(capT *int, durT *int, flavT *int, texT *int, calT *int) {
+    if *capT < 0 {
+        *capT = 0
+    }
+    if *durT < 0 {
+        *durT = 0
+    }
+    if *flavT < 0 {
+        *flavT = 0
+    }
+    if *texT < 0 {
+        *texT = 0
+    }
+}
+
 func main() {
 	fmt.Println("-- Day 15 --")
 
@@ -91,35 +114,17 @@ func main() {
                         iCal = 0
                     }
 
-					iCap += (a * ingList[0].capacity)
-					iDur += (a * ingList[0].durability)
-					iFlav += (a * ingList[0].flavor)
-					iTex += (a * ingList[0].texture)
-					iCal += (a * ingList[0].calories)
-
-					iCap += (b * ingList[1].capacity)
-					iDur += (b * ingList[1].durability)
-					iFlav += (b * ingList[1].flavor)
-					iTex += (b * ingList[1].texture)
-					iCal += (b * ingList[1].calories)
-
-					iCap += (c * ingList[2].capacity)
-					iDur += (c * ingList[2].durability)
-					iFlav += (c * ingList[2].flavor)
-					iTex += (c * ingList[2].texture)
-					iCal += (c * ingList[2].calories)
-
-					iCap += (d * ingList[3].capacity)
-					iDur += (d * ingList[3].durability)
-					iFlav += (d * ingList[3].flavor)
-					iTex += (d * ingList[3].texture)
-					iCal += (d * ingList[3].calories)
-		
-                    if iCap < 0 || iDur < 0 || iFlav < 0 || iTex < 0 {
-                        score = 0
-                    } else {
-                        score = iCap * iDur * iFlav * iTex
+                    addToTotals(ingList[0], a, &iCap, &iDur, &iFlav, &iTex, &iCal)
+                    addToTotals(ingList[1], b, &iCap, &iDur, &iFlav, &iTex, &iCal)
+                    addToTotals(ingList[2], c, &iCap, &iDur, &iFlav, &iTex, &iCal)
+                    addToTotals(ingList[3], d, &iCap, &iDur, &iFlav, &iTex, &iCal)
+                    clampToZero(&iCap, &iDur, &iFlav, &iTex, &iCal)
+	
+                    if iCal != 500 {
+                        continue // Part Two
                     }
+
+                    score = iCap * iDur * iFlav * iTex
                     scores = append(scores, score)
 
                     if score > highest {
