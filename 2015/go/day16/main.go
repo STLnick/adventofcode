@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/bufbuild/buf/private/buf/cmd/buf/command/breaking"
 )
 
 //type auntSue struct {
@@ -83,7 +86,8 @@ func compileSues() []auntSue {
 
 func main() {
 	fmt.Println("-- Day 16 --")
-	sues := compileSues()
+	gtKeys := []string{"cats", "trees"}
+	ltKeys := []string{"goldfish", "pomeranians"}
 	output := map[string]int{
 		"children":    3,
 		"cats":        7,
@@ -96,11 +100,12 @@ func main() {
 		"cars":        2,
 		"perfumes":    1,
 	}
+	sues := compileSues()
 
 	var (
-		sueVal        int
-		ok            bool
-		matches       bool
+		sueVal  int
+		ok      bool
+		matches bool
 	)
 
 	for _, sue := range sues {
@@ -108,15 +113,32 @@ func main() {
 
 		for key, val := range output {
 			sueVal, ok = sue.props[key]
-			if ok && sueVal != val {
-				matches = false
-                break
+
+            if !ok {
+                continue
+            }
+
+			if slices.Contains(gtKeys, key) {
+				if sueVal <= val {
+					matches = false
+					break
+				}
+			} else if slices.Contains(ltKeys, key) {
+				if sueVal >= val {
+					matches = false
+					break
+				}
+			} else {
+				if sueVal != val {
+					matches = false
+					break
+				}
 			}
 		}
 
 		if matches {
-            fmt.Println("Matching Sue ID:", sue.id)
-            break
+			fmt.Println("Matching Sue ID:", sue.id)
+			break
 		}
 	}
 }
