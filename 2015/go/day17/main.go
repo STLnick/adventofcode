@@ -10,9 +10,9 @@ import (
 )
 
 func checkFatal(err error, msg string) {
-    if err != nil {
-        log.Fatal(msg, " :: ", err)
-    }
+	if err != nil {
+		log.Fatal(msg, " :: ", err)
+	}
 }
 
 func setup() ([]int, int) {
@@ -28,7 +28,7 @@ func setup() ([]int, int) {
 
 	strList := strings.Split(string(file), "\n")
 	var intVal int
-    var intList []int
+	var intList []int
 
 	for _, val := range strList {
 		if val == "" {
@@ -43,27 +43,37 @@ func setup() ([]int, int) {
 }
 
 func getCount(total int, n int, i int) int {
-    if n < 0 {
-        return 0
-    } else if total == 0 {
-        return 1
-    } else if i == len(containers) || total < 0 {
-        return 0
-    }
+	if n < 0 {
+		return 0
+	} else if total == 0 {
+        key := len(containers) - n
+		if _, ok := solutionMap[key]; !ok {
+			solutionMap[key] = 0
+		}
+		solutionMap[key]++
+		return 1
+	} else if i == len(containers) || total < 0 {
+		return 0
+	}
 
-    return getCount(total, n, i+1) + getCount(total - containers[i], n-1, i+1)
+	return getCount(total, n, i+1) + getCount(total-containers[i], n-1, i+1)
 }
 
 var containers []int
+var solutionMap map[int]int
 
 func main() {
-    fmt.Println("-- Day 17 --")
-    var total int
-    containers, total = setup()
+	fmt.Println("-- Day 17 --")
+	var total int
+	solutionMap = make(map[int]int)
+	containers, total = setup()
 
-    fmt.Println("Containers", containers)
-    fmt.Println("Starting Total", total)
+    // Part One
+	count := getCount(total, len(containers), 0)
+	fmt.Print("*** Count ", count, " ***\n\n")
 
-    count := getCount(total, len(containers), 0)
-    fmt.Println("*** Count", count, "***")
+    // Part Two
+    for k, v := range solutionMap {
+        fmt.Printf("%d Containers used in (%d) solutions\n", k, v)
+    }
 }
