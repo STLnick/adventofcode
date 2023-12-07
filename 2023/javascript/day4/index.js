@@ -25,6 +25,19 @@ function checkCardPoints(line) {
   return points;
 }
 
+function checkCardMatches(line) {
+  let matches = 0;
+  const [winningNums, cardNums] = parseCardNumbers(line);
+
+  cardNums.forEach((cn) => {
+    if (winningNums.includes(cn)) {
+      matches++;
+    }
+  });
+
+  return matches;
+}
+
 const filename =
   process.argv.includes("t") || process.argv.includes("-t")
     ? "input-test.txt"
@@ -38,9 +51,33 @@ const lines = fs
 
 let pointSum = 0;
 for (let i = 0; i < lines.length; i++) {
-  console.log(lines[i]);
-
   pointSum += checkCardPoints(lines[i]);
 }
 
 console.log("Part 1 - Points Sum:", pointSum);
+
+const cardCounts = Array(lines.length).fill(1);
+let matches = 0;
+let localMatches;
+
+for (let i = 0; i < lines.length; i++) {
+  matches = checkCardMatches(lines[i]);
+
+  if (matches > 0) {
+    for (let j = 0; j < cardCounts[i]; j++) {
+      localMatches = matches;
+      for (
+        let copyIdx = i + 1;
+        copyIdx < lines.length && localMatches > 0;
+        copyIdx++
+      ) {
+        cardCounts[copyIdx]++;
+        localMatches--;
+      }
+    }
+  }
+}
+
+const totalCards = cardCounts.reduce((sum, c) => sum + c, 0);
+
+console.log("Part 2 - Total Cards:", totalCards);
