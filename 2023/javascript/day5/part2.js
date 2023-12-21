@@ -41,8 +41,8 @@ function createMap(lines, start) {
       finalMappings.push({
         dest: endSrc,
         src: endSrc,
-        srcEnd: Infinity,
-        range: Infinity,
+        srcEnd: 5_000_000_000,
+        range: 5_000_000_000 - endSrc,
         delta: 0,
       });
 
