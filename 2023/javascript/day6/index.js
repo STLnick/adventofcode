@@ -7,10 +7,15 @@ function getLines() {
   return fs.readFileSync(__dirname + "/" + filename).toString().split("\n").filter(Boolean);
 }
 
-function getTimeDistanceMap() {
+function getTimeDistanceMap(joinAsOneNum = false) {
   const [time, distance] = getLines();
-  const splitTime = time.split(": ")[1].trim().split(" ").filter(Boolean);
-  const splitDistance = distance.split(": ")[1].trim().split(" ").filter(Boolean);
+  let splitTime = time.split(": ")[1].trim().split(" ").filter(Boolean);
+  let splitDistance = distance.split(": ")[1].trim().split(" ").filter(Boolean);
+
+  if (joinAsOneNum) {
+    splitTime = [ splitTime.join("") ];
+    splitDistance = [ splitDistance.join("") ];
+  }
 
   let map = {};
 
@@ -29,7 +34,7 @@ function getMMTraveled(timeMs, msHeld) {
   return (timeMs - msHeld) * msHeld;
 }
 
-function main() {
+function part1() {
   const tdMap = getTimeDistanceMap();
   const times = Object.keys(tdMap);
   let possibilities = {};
@@ -49,5 +54,31 @@ function main() {
   console.log(product);
 }
 
-main();
+function part2() {
+  const tdMap = getTimeDistanceMap(true);
+  const times = Object.keys(tdMap);
+  let possibilities = {};
+  let reachedPossibles;
+
+  times.forEach(timeMs => {
+    possibilities[timeMs] = 0;
+    reachedPossibles = false;
+    
+    for (let held = 1; held < timeMs; held++) {
+      if (getMMTraveled(timeMs, held) > tdMap[timeMs]) {
+        if (!reachedPossibles) reachedPossibles = true
+        possibilities[timeMs]++;
+      } else if (reachedPossibles && getMMTraveled(timeMs, held) <= tdMap[timeMs]) {
+        break;
+      }
+    }
+  });
+  
+  console.log("P2", possibilities);
+  const product = Object.values(possibilities).reduce((acc, num) => acc * num, 1);
+  console.log("P2", product);
+}
+
+part1();
+part2();
 
