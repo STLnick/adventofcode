@@ -24,6 +24,8 @@ function createMap(lines, start) {
           });
         }
       }
+      
+      finalMappings.sort((a, b) => (a.src < b.src ? -1 : 1));
 
       if (finalMappings[0].src !== 0) {
         finalMappings.unshift({
@@ -46,6 +48,7 @@ function createMap(lines, start) {
         delta: 0,
       });
 
+      finalMappings.sort((a, b) => (a.src < b.src ? -1 : 1));
 
       return [finalMappings, i];
     }
@@ -80,7 +83,7 @@ function splitRangeWithMappings(currentRange, mappings) {
   const nextStart = mappingRange.src + mappingRange.range;
 
   return [
-    [start, nextStart - 1],
+    [ start + mappingRange.delta, nextStart - 1 + mappingRange.delta ],
     ...splitRangeWithMappings([nextStart, end], mappings),
   ];
 }
@@ -111,42 +114,59 @@ function valIsWithinRange(val, range) {
   return val >= range.src && val <= range.src + range.range - 1;
 }
 
-const filename = process.argv.includes("-t") ? "input-test.txt" : "input.txt";
-const lines = fs.readFileSync(filename).toString().split("\n");
-const seedRanges = getSeeds(lines[0]);
-let masterMap = {};
-let mapIdx = 0;
+function getLines() {
+  const filename = process.argv.includes("-t") ? "input-test.txt" : "input.txt";
+  return fs.readFileSync(filename).toString().split("\n");
+}
 
-for (let i = 1; i < lines.length; i++) {
-  if (lines[i] !== "") {
-    const [newMap, resumeIdx] = createMap(lines, i + 1);
-    masterMap[mapIdx++] = newMap;
-    i = resumeIdx;
+function main(lines) {
+  const seedRanges = getSeeds(lines[0]);
+  let masterMap = {};
+  let mapIdx = 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] !== "") {
+      const [newMap, resumeIdx] = createMap(lines, i + 1);
+      masterMap[mapIdx++] = newMap;
+      i = resumeIdx;
+    }
+  }
+
+  const seedRangeArrs = seedRanges.map(getSeedRangeAsArray);
+  let currentRanges = [...seedRangeArrs];
+  let mappings;
+
+  for (let j = 0; j < Object.keys(masterMap).length; j++) {
+    mappings = masterMap[j];
+    const copiedRanges = JSON.parse(JSON.stringify(currentRanges));
+    currentRanges = [];
+
+    for (let ri = 0; ri < copiedRanges.length; ri++) {
+      currentRanges.push(
+        ...splitRangeWithMappings(copiedRanges[ri], mappings)
+      );
+    }
+  
+    // Re-sort the current ranges by start value
+    currentRanges.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  }
+
+  return currentRanges[0][0];
+}
+
+const runs = 1;
+const lines = getLines();
+let val;
+let results = {};
+
+for (let m = 0; m < runs; m++) {
+  val = main(lines);
+  if (results[val]) {
+    results[val] += 1;
+  } else {
+    results[val] = 1;
   }
 }
 
-const seedRangeArrs = seedRanges.map(getSeedRangeAsArray);
-let currentRanges = [...seedRangeArrs];
-let mappings;
+console.log(`Ran (${runs}) times :: results\n${JSON.stringify(results, null, 2)}`);
 
-for (let j = 0; j < Object.keys(masterMap).length; j++) {
-  mappings = masterMap[j];
-  const copiedRanges = JSON.parse(JSON.stringify(currentRanges));
-  currentRanges = [];
- 
-  for (let ri = 0; ri < copiedRanges.length; ri++) {
-    currentRanges.push(
-      ...splitRangeWithMappings(copiedRanges[ri], mappings)
-    );
-  }
-
-  // Re-sort the current ranges by start value
-  currentRanges.sort((a, b) => (a[0] < b[0] ? -1 : 1));
-  //console.log({ currentRanges })
-}
-
-//console.log({currentRanges})
-console.log(
-  "Lowest Location Number [first range, first val]: ",
-  currentRanges[0][0],
-);
