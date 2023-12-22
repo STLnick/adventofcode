@@ -11,16 +11,38 @@ function getLines() {
   return fs.readFileSync(__dirname + "/" + filename).toString().split("\n").filter(Boolean);
 }
 
-function part1(lines) {
-  console.log("P1 :: lines");
-  console.log(lines);
+function createNodeInObject(obj, dir) {
+  const [ source, leftRightStr ] = dir.split(" = ");
+  const [ left, right ] = leftRightStr.slice(1, leftRightStr.length - 1).split(", ");
+  obj[source] = { L: left, R: right };
+}
 
-  return null;
+function part1(instructions, directions, start, goal) {
+  let moves = 0;
+  let current = start;
+  let currentInstruction;
+  let instructionIdx = 0;
+
+  while (current !== goal) {
+    currentInstruction = instructions[instructionIdx]; 
+    current = directions[current][currentInstruction];
+    moves++;
+    instructionIdx++;
+
+    if (instructionIdx === instructions.length) {
+      instructionIdx = 0;
+    }
+  }
+
+  return moves;
 }
 
 function main() {
-  const lines = getLines()
-  const part1Result = part1(lines);
+  const [ instructions, ...directionStrs ] = getLines();
+  const directions = {};
+  directionStrs.forEach(ds => createNodeInObject(directions, ds));
+
+  const part1Result = part1(instructions, directions, 'AAA', 'ZZZ');
   console.log({ part1Result });
 }
 
