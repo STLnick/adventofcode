@@ -11,10 +11,14 @@ function getLines() {
   return fs.readFileSync(__dirname + "/" + filename).toString().split("\n").filter(Boolean);
 }
 
-function createNodeInObject(obj, dir) {
-  const [ source, leftRightStr ] = dir.split(" = ");
-  const [ left, right ] = leftRightStr.slice(1, leftRightStr.length - 1).split(", ");
-  obj[source] = { L: left, R: right };
+function createDirectionNodes(directionStrs) {
+  const directions = {};
+  directionStrs.forEach(ds => {
+    const [ source, leftRightStr ] = ds.split(" = ");
+    const [ left, right ] = leftRightStr.slice(1, leftRightStr.length - 1).split(", ");
+    directions[source] = { L: left, R: right };
+  });
+  return directions;
 }
 
 function part1(instructions, directions, start, goal) {
@@ -39,10 +43,9 @@ function part1(instructions, directions, start, goal) {
 
 function main() {
   const [ instructions, ...directionStrs ] = getLines();
-  const directions = {};
-  directionStrs.forEach(ds => createNodeInObject(directions, ds));
-
+  const directions = createDirectionNodes(directionStrs);
   const part1Result = part1(instructions, directions, 'AAA', 'ZZZ');
+  
   console.log({ part1Result });
 }
 
