@@ -23,9 +23,24 @@ const cardRanks = {
   'K': 11,
   'A': 12,
 };
+const cardRanks2 = {
+  'J': 0,
+  '2': 1,
+  '3': 2,
+  '4': 3,
+  '5': 4,
+  '6': 5,
+  '7': 6,
+  '8': 7,
+  '9': 8,
+  'T': 9,
+  'Q': 10,
+  'K': 11,
+  'A': 12,
+};
 
-function getCardRank(card) {
-  return cardRanks[card];
+function getCardRank(card, partTwo = false) {
+  return partTwo ? cardRanks2[card] : cardRanks[card];
 }
 
 const handTypes = {
@@ -62,6 +77,8 @@ function mapHands(hands) {
 
 function determineHandType(hand) {
   const matches = {};
+  let highestMatchedCard = '';
+  let highestMatchedNum = 0;
 
   hand.split("").forEach(card => {
     if (matches[card]) {
@@ -69,34 +86,40 @@ function determineHandType(hand) {
     } else {
       matches[card] = 1;
     }
+
+    if (card !== 'J' && matches[card] > highestMatchedNum) {
+      highestMatchedNum = matches[card];
+      highestMatchedCard = card;
+    }
   });
 
-  const matchCounts = Object.values(matches).sort((a, b) => a - b);
+  // Apply wilds to highest matched card
+  if (matches['J'] && matches['J'] !== 5) {
+    matches[highestMatchedCard] += matches['J'];
+    matches['J'] = 0;
+  }
 
-  if (matchCounts.every(val => val === 1)) {
-    return handTypes.HIGH_CARD;
-  } else if (matchCounts.includes(5)) {
-    return handTypes.FIVE_OF_A_KIND;
-  } else if (matchCounts.includes(4)) {
-    return handTypes.FOUR_OF_A_KIND;
-  } else if (matchCounts.includes(3) && matchCounts.includes(2)) {
-    return handTypes.FULL_HOUSE;
-  } else if (matchCounts.includes(3)) {
-    return handTypes.THREE_OF_A_KIND;
-  } else {
-    const pairs = matchCounts.filter(mc => mc === 2);
-    switch (pairs.length) {
-      case 1:
-        return handTypes.ONE_PAIR;
-      case 2:
-        return handTypes.TWO_PAIR;
-      default:
-        throw new Error("unexpected case getting hand type");
-    }
+  const matchCounts = Object.values(matches);
+
+  switch (highestMatchedNum) {
+    case 5:
+      return handTypes.FIVE_OF_A_KIND;
+    case 4:
+      return handTypes.FOUR_OF_A_KIND;
+    case 3:
+      return matchCounts.includes(2)
+        ? handTypes.FULL_HOUSE
+        : handTypes.THREE_OF_A_KIND;
+    case 2:
+      return matchCounts.filter(mc => mc === 2).length === 1
+        ? handTypes.ONE_PAIR
+        : handTypes.TWO_PAIR;
+    default:
+      return handTypes.HIGH_CARD;
   }
 }
 
-function sortByCardStrength(cards) {
+function sortByCardStrength(cards, partTwo = false) {
   if (cards.length === 0) return [];
   if (cards.length === 1) return cards;
 
@@ -121,10 +144,10 @@ function sortByCardStrength(cards) {
 
       // While I haven't inserted, seen I can skip this hand, or gone through all cards in hand
       while (!inserted && !skip && cardIdx < HAND_LENGTH) {
-        currentIsStronger = getCardRank(current.hand[cardIdx])
-          < getCardRank(sorted[idx].hand[cardIdx]);
-        nextIsStronger = getCardRank(current.hand[cardIdx])
-          > getCardRank(sorted[idx].hand[cardIdx]);
+        currentIsStronger = getCardRank(current.hand[cardIdx], partTwo)
+          < getCardRank(sorted[idx].hand[cardIdx], partTwo);
+        nextIsStronger = getCardRank(current.hand[cardIdx], partTwo)
+          > getCardRank(sorted[idx].hand[cardIdx], partTwo);
         
         if (nextIsStronger) {
           sorted.splice(idx, 0, current);
@@ -159,11 +182,13 @@ function main() {
   let currentTypeRankHands = [];
   let strengthRank = 1;
 
+  const isPartTwo = true;
+
   while (currentTypeRank <= highestTypeRank) {
     currentTypeRankHands = sortedByTypeRank.filter(hand => hand.typeRank === currentTypeRank);
 
     if (currentTypeRankHands.length > 0) {
-      const sortedByCardStrength = sortByCardStrength(currentTypeRankHands);
+      const sortedByCardStrength = sortByCardStrength(currentTypeRankHands, isPartTwo);
       sortedByCardStrength.forEach(sortedHand => {
         currentTypeRankHands.find(h => h.hand === sortedHand.hand).rank = strengthRank;
         strengthRank++;
