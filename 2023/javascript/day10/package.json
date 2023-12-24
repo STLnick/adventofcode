@@ -1,0 +1,15 @@
+{
+  "name": "day10",
+  "version": "1.0.0",
+  "description": "AOC 2023 Day 10",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "jest"
+  },
+  "author": "Nick Ray",
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
