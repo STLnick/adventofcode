@@ -1,6 +1,9 @@
 const fs = require("fs");
 const readline = require("readline");
 
+const GALAXY = "#";
+const SPACE = ".";
+
 async function* processLineByLine() {
   const filename = process.argv.includes("t") || process.argv.includes("-t")
     ? "input-test.txt"
@@ -17,7 +20,7 @@ async function* processLineByLine() {
   yield null;
 }
 
-async function findClearRowsCols() {
+async function parseData() {
   let clearColumns = [];
   let clearRows = [];
   let lines = [];
@@ -25,12 +28,12 @@ async function findClearRowsCols() {
 
   for await (const line of processLineByLine()) {
     if (line === null) {
-      continue;
+      break;
     }
    
     lines.push(line);
 
-    if (line.every(c => c === ".")) {
+    if (line.every(c => c === SPACE)) {
       clearRows.push(y);
     }
 
@@ -38,18 +41,32 @@ async function findClearRowsCols() {
   }
 
   for (let x = 0; x < lines[0].length; x++) {
-    if (lines.every(l => l[x] === ".")) {
+    if (lines.every(l => l[x] === SPACE)) {
       clearColumns.push(x);
     }
   }
 
-  lines.forEach(l => console.log(l.join("")));
-
   return { clearColumns, clearRows, lines };
 }
 
+function findGalaxies(lines) {
+  let galaxies = [];
+  let id = 1;
+
+  lines.forEach((line, y) => {
+    line.forEach((char, x) => {
+      if (char === GALAXY) {
+        galaxies.push({ id, coords: [y, x] });
+        id++;
+      }
+    });
+  });
+
+  return galaxies;
+}
+
 function expandUniverse(lines, clearColumns, clearRows) {
-  const copyStr = String(".").repeat(lines[0].length);
+  const copyStr = SPACE.repeat(lines[0].length);
   let inserted = 0;
 
   clearRows.forEach(rowIdx => {
@@ -60,24 +77,54 @@ function expandUniverse(lines, clearColumns, clearRows) {
   inserted = 0;
   clearColumns.forEach(colIdx => {
     lines.forEach(line => {
-      line.splice(colIdx + inserted, 0, ".");
+      line.splice(colIdx + inserted, 0, SPACE);
     });
     inserted++;
   });
 }
 
+function getNumberOfPossiblePairs(numOfNodes) {
+  let num = 0;
+  for (let add = numOfNodes - 1; add > 0; add--) {
+    num += add;
+  }
+  return num;
+}
+
+function getDistanceBetweenGalaxies([y1, x1], [y2, x2]) {
+  return Math.abs(y2 - y1) + Math.abs(x2 - x1);
+}
+
+function findGalaxyPairPaths(lines) {
+  const galaxies = findGalaxies(lines);
+  const numOfPossiblePairs = getNumberOfPossiblePairs(galaxies.length);
+  let distances = new Array(numOfPossiblePairs);
+  let galaxy, pairGalaxy;
+  let distIdx = 0;
+
+  for (let i = 0; i < galaxies.length - 1; i++) {
+    galaxy = galaxies[i];
+ 
+    for (let j = i + 1; j < galaxies.length; j++) {
+      pairGalaxy = galaxies[j];
+      distances[distIdx] = getDistanceBetweenGalaxies(galaxy.coords, pairGalaxy.coords),
+      distIdx++;
+    }
+  }
+  
+  return distances;
+}
+
 async function part1() {
-  let { clearColumns, clearRows, lines } = await findClearRowsCols();
-  console.log({ clearRows, clearColumns });
-
-  lines = expandUniverse(lines, clearColumns, clearRows);
-
-  return 'IDK';
+  let { clearColumns, clearRows, lines } = await parseData();
+  expandUniverse(lines, clearColumns, clearRows);
+  const pairDistances = findGalaxyPairPaths(lines);
+  return pairDistances.reduce((sum, dist) => sum + dist, 0);
 }
 
 async function main() {
   const p1Result = await part1();
-  console.log("Part One Result:", p1Result);
+  /**LOG */ console.log("Part 1 Result:", p1Result);
 }
 
 main();
