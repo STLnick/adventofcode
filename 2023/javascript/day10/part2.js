@@ -125,25 +125,63 @@ function advancePath(path, lines) {
   path.source = determineSource(dest);
 }
 
-function genIsOnMainPath(pathTiles) {
-  return (y, x) => {
-    const result = pathTiles.some(t => {
-      return t[0] === y && t[1] === x;
-    });
-    console.log("is [", y, x, "] on main?", result)
-    return result;
-  };
+function getIncludeDir(current, char) {
+  switch (char) {
+    case "7":
+      if (current === "none") {
+        return "left";
+      } else {
+        return "right";
+      }
+    case "J":
+      if (current === "left") {
+        return "none";
+      } else {
+        return "bottom";
+      }
+    case "F":
+      if (current === "none") {
+        return "right";
+      } else {
+        return "left";
+      }
+    case "L":
+      if (current === "left") {
+        return "bottom";
+      } else {
+        return "none";
+      }
+    case "-":
+      if (current === "none") {
+        return "bottom";
+      } else {
+        return "none";
+      }
+    default:
+      console.error({ current, char })
+      throw new Error("unexpected current/char combo");
+  }
 }
 
-function part2() {
-  const lines = getLines();
- 
-  //lines.forEach(l => console.log(l.split("").join(" ")));
-  
-  const startRowCol = getStartCoords(lines);
-  const [ path1, path2 ] = getStartingPaths(startRowCol, lines);
+function replaceStartWithPipe(lines, startRowCol, path1, path2) {
+  const connectionKey = Object.freeze({
+    [`${NORTH}-${EAST}`]: "7",
+    [`${NORTH}-${SOUTH}`]: "|",
+    [`${NORTH}-${WEST}`]: "F",
+    [`${EAST}-${SOUTH}`]: "J",
+    [`${EAST}-${WEST}`]: "-",
+    [`${SOUTH}-${WEST}`]: "L",
+  });
+  const pathKey = [path1.source, path2.source].sort((a, b) => a - b).join("-");
+  const pipe = connectionKey[pathKey];
+
+  let temp = lines[startRowCol[0]].split("");
+  temp[startRowCol[1]] = pipe;
+  lines[startRowCol[0]] = temp.join("");
+}
+
+function findPathTiles(lines, startRowCol, path1, path2) {
   let pathTiles = [ startRowCol, [ ...path1.coords ], [ ...path2.coords ] ];
-  const isOnMainPath = genIsOnMainPath(pathTiles);
   let isOnSameSquare = false;
 
   while (!isOnSameSquare) {
@@ -157,38 +195,57 @@ function part2() {
     }
   }
 
-  console.log({ pathTiles });
+  return pathTiles;
+}
 
+function countInternalTiles(lines, pathTiles) {
+  const isOnMainPath = (y, x) => pathTiles.some(t => t[0] === y && t[1] === x);
+  let including, char, charIsOnMain, nextCharIsOnMain;
   let includedCount = 0;
-  let including;
-  let char;
+  let includeDir = "none";
 
   for (let x = 0; x < lines[0].length; x++) {
     including = false;
+    includeDir = "none";
 
     for (let y = 0; y < lines.length; y++) {
       char = lines[y][x];
       charIsOnMain = isOnMainPath(y, x);
-      console.log(char);
+      nextCharIsOnMain = y + 1 < lines.length && isOnMainPath(y + 1, x);
 
-      if (!including && char !== "|" && charIsOnMain) {
-        console.log("not including and on main path: flipping to true");
-        including = true;
-
-      } else if (including && char !== "|" && charIsOnMain) {
-        console.log("including && not '|' && on main path :: incrementing count");
-        including = false;
-
-      } else if (including && !charIsOnMain) {
-        console.log("including && not on main path :: incrementing count");
-        includedCount++;
+      if (including) {
+        if (!charIsOnMain) {
+          includedCount++;
+          includeDir = "all";
+        } else if (charIsOnMain && char !== "|") {
+          includeDir = getIncludeDir(includeDir, char);
+          if (includeDir === "none") {
+            including = false;
+          }
+        }
       } else {
-        console.log("no-op", { includedCount, including, char, charIsOnMain });
+        if (char !== "|" && charIsOnMain) {
+          including = true;
+          includeDir = getIncludeDir(includeDir, char);
+        }
       }
     }
   }
 
   return includedCount;
+}
+
+function part2() {
+  const lines = getLines();
+  const startRowCol = getStartCoords(lines);
+  const [ path1, path2 ] = getStartingPaths(startRowCol, lines);
+
+  replaceStartWithPipe(lines, startRowCol, path1, path2);
+ 
+  const pathTiles = findPathTiles(lines, startRowCol, path1, path2);
+  const internalTiles = countInternalTiles(lines, pathTiles);
+
+  return internalTiles;
 }
 
 module.exports = part2;
