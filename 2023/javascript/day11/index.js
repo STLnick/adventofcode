@@ -65,21 +65,23 @@ function findGalaxies(lines) {
   return galaxies;
 }
 
-function expandUniverse(lines, clearColumns, clearRows) {
-  const copyStr = SPACE.repeat(lines[0].length);
+function expandUniverse(lines, clearColumns, clearRows, expandFactor = 2) {
+  const copyRow = SPACE.repeat(lines[0].length);
   let inserted = 0;
 
   clearRows.forEach(rowIdx => {
-    lines.splice(rowIdx + inserted, 0, String(copyStr).split("")); 
-    inserted++;
+    const newRows = new Array(expandFactor - 1).fill(String(copyRow).split(""));
+    lines.splice(rowIdx + inserted, 0, ...newRows); 
+    inserted += expandFactor - 1;
   });
 
   inserted = 0;
   clearColumns.forEach(colIdx => {
     lines.forEach(line => {
-      line.splice(colIdx + inserted, 0, SPACE);
+      const newCols = new Array(expandFactor - 1).fill(SPACE);
+      line.splice(colIdx + inserted, 0, ...newCols);
     });
-    inserted++;
+    inserted += expandFactor - 1;
   });
 }
 
@@ -118,13 +120,27 @@ function findGalaxyPairPaths(lines) {
 async function part1() {
   let { clearColumns, clearRows, lines } = await parseData();
   expandUniverse(lines, clearColumns, clearRows);
-  const pairDistances = findGalaxyPairPaths(lines);
-  return pairDistances.reduce((sum, dist) => sum + dist, 0);
+  const doubledUniSum = findGalaxyPairPaths(lines).reduce((sum, dist) => sum + dist, 0);
+  return doubledUniSum;
+}
+
+async function part2(factor) {
+  let { clearColumns, clearRows, lines } = await parseData();
+  const baseSum = findGalaxyPairPaths(lines).reduce((sum, dist) => sum + dist, 0);
+  expandUniverse(lines, clearColumns, clearRows);
+  const doubledUniSum = findGalaxyPairPaths(lines).reduce((sum, dist) => sum + dist, 0);
+  const diff = doubledUniSum - baseSum;
+
+  return baseSum + diff * (factor - 1);
 }
 
 async function main() {
+  /**LOG */ console.log("-- Day 11 --");
   const p1Result = await part1();
   /**LOG */ console.log("Part 1 Result:", p1Result);
+  const p2Result = await part2(1_000_000);
+  /**LOG */ console.log("Part 2 Result:", p2Result);
 }
 
 main();
+
