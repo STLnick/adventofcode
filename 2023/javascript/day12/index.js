@@ -21,58 +21,82 @@ async function* getLine() {
   yield null;
 }
 
-function checkhighestOfGroups(groups, num) {
-  const highest = groups.reduce((hi, n) => hi < n ? n : hi, 0);
-  return highest === num;
+function isPossibleRange(springs, range) {
+  for (let cursor = range[0], end = range[1]; cursor < end + 1; cursor++) {
+    if (springs[cursor] === springStates.OPERATIONAL) {
+      return false;
+    }
+  }
+  
+  const prevIdx = range[0] - 1; 
+  const prevCharIsValid = prevIdx < 0 || springs[prevIdx] !== springStates.DAMAGED;
+  
+  if (!prevCharIsValid) {
+    return false;
+  }
+  
+  const nextIdx = range[1] + 1; 
+  const nextCharIsValid = nextIdx >= springs.length || springs[nextIdx] !== springStates.DAMAGED;
+  
+  return nextCharIsValid;
 }
 
-function processSpringsStr(springs, groups) {
-  console.log("\n- - - - - - - - - - - - - - - - - - - - -");
-  console.log("processSpringsStr() :: ", { springs: springs.join(""), groups });
+function walkPossibilities(springs, range, groups, currentGroupIdx) {
+  // if is a leaf node / possibility
+  if (currentGroupIdx === groups.length - 1) {
+    console.log("Should be LEAF NODE");
+    console.log({ springs, range, groups, currentGroupIdx });
+    console.log(groups[currentGroupIdx], ": range", range);
 
-  let checkIdx, end, group, start;
-  let nextStart = 0;
-  let prevEnd = 0;
-  let possible = false;
+    return 1;
+  }
 
-  for (let g = 0; g < groups.length; g++) {
-    group = parseInt(groups[g]);
-    start = parseInt(nextStart);
-    end = start + group;
-    possible = false;
-    checkIdx = 0;
+  const nextGroupIdx = groups[currentGroupIdx + 1];
+  const nextGroup = groups[nextGroupIdx];
+  let start = range[1];
 
-    // start to walk string to find a possibility
-    // find a X length str of "#" or "?" or a combo
-    console.log("processSpringsStr() :: group", group, ":", { start, end });
-    
-    while (!possible) {
-      possible = true;
+  if (currentGroupIdx !== -1) {
+    start += 2; // Start with one space gap between last range
+  }
 
-      for (checkIdx = start; checkIdx < end; checkIdx++) {
-        if (springs[checkIdx] === springStates.OPERATIONAL) {
-          possible = false;
-          break;
-        }
-      }
-   
-      if (!possible) {
-        start++;
-        end++;
-      }
+  let end = start + nextGroup - 1;
+  
+  if (end >= springs.length) {
+    return 0;
+  }
+  
+  let possibilities = 0;
+
+  while (end < springs.length) {
+    const range = new Array(start, end);
+    if (isPossibleRange(springs, range)) {
+      possibilities += walkPossibilities(springs, range, groups, nextGroupIdx);
     }
 
-    console.log("* Possible section for(", group, "):(", start, ",", end, "):", springs.slice(start, end));
+    start++;
+    end++;
+  }
 
-    prevEnd = end;
-    nextStart = end + 1;
+  return possibilities;
+}
+
+function findRange(length, offset) {
+  return new Array(offset, offset + length - 1);
+}
+
+function findPossibilites(springs, groups) {
+  console.log("findPossibilites() :: START", { springs, groups });
+  let possibilities = 0;
+
+  for (let i = 0; i < groups.length; i++) {
+    possibilities += walkPossibilities(springs, new Array(0, 0), groups, -1);
+    console.log("* possibilities", possibilities);
   }
 }
 
 async function part1() {
   let groups, springsStr, springs;
 
-  let logged = false;
   for await (const line of getLine()) {
     if (line === null) {
       break;
@@ -80,21 +104,15 @@ async function part1() {
 
     [ springsStr, groups ] = line.split(" ");
     springs = springsStr.split("");
-    groups = groups.split(",");
+    groups = groups.split(",").map(numStr => parseInt(numStr));
 
-    // processSpringsStr(springs, groups);
-    if (!logged) {
-      processSpringsStr(springs, groups);
-      logged = true;
-    }
-
-    // /**LOG*/ console.log({ line, springs, groups });
+    findPossibilites(springs, groups);
   }
 }
 
 async function main() {
   const p1Result = await part1();
-  /**LOG*/ console.log("Part 1 Result:", p1Result);
+  /**LOG*/ console.log("\nPart 1 Result:", p1Result);
 }
 
 main();
