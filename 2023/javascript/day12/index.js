@@ -1,10 +1,34 @@
 const fs = require("fs");
 const readline = require("readline");
 
+const logs = {
+  data: [],
+  disabled: false,
+  disableLogs() {
+    this.disabled = true;
+  },
+  print() {
+    if (this.disabled) return;
+    this.data.forEach(l => console.log(l));
+  },
+  push(val) {
+    if (this.disabled) return;
+    this.data.push(val);
+  },
+  reset() {
+    if (this.disabled) return;
+    this.data = [];
+  },
+};
 const springStates = Object.freeze({
   DAMAGED: "#",
   OPERATIONAL: ".",
   UNKNOWN: "?",
+});
+const walkEvents = Object.freeze({
+  DISPATCH: 'dispatch',
+  POSSIBILITY: 'possibility',
+  RUN: 'run',
 });
 
 async function* getLine() {
@@ -22,12 +46,11 @@ async function* getLine() {
 }
 
 function isPossibleRange(springs, range) {
-  /**LOG*/ logs.push(` >>>> Finding [${range[0]}, ${range[1]}] >>>>`);
+  logs.push(` >>>> Finding [${range[0]}, ${range[1]}] >>>>`);
   
   for (let cursor = range[0]; cursor < range[1] + 1; cursor++) {
     if (springs[cursor] === springStates.OPERATIONAL) {
-      /**LOG*/ logs.push(`-!- range (${range}) is INVALID ::  currentStartIdx(${range[0]}) contains OPERATIONAL spring at (${cursor})`);
-      /**LOG*/ logs.push(" >>>> ");
+      logs.push(`-!- range (${range}) is INVALID ::  currentStartIdx(${range[0]}) contains OPERATIONAL spring at (${cursor})`);
       return false;
     }
   }
@@ -38,26 +61,56 @@ function isPossibleRange(springs, range) {
   return nextCharIsValid;
 }
 
+function endHasDamaged(springs, start) {
+  if (start >= springs.length) {
+    return false;
+  }
+
+  for (let i = start; i < springs.length; i++) {
+    if (springs[i] === springStates.DAMAGED) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function logWalk({ eventType, springs, range, groups, groupIdx, path, callback }) {
+  switch (eventType) {
+    case walkEvents.DISPATCH:
+      logs.push(`++ dispatching from #${groupIdx}->#${groupIdx + 1} walk(range=${range}, nextGroupIdx=${groupIdx + 1})`);
+      break;
+    case walkEvents.POSSIBILITY:
+      let str = Array(springs.length).fill(" ");
+      let i, start, end;
+      path.split("&").forEach(rangeStr => {
+        [ start, end ] = rangeStr.split("-");
+        for (i = parseInt(start); i < parseInt(end) + 1; i++) {
+          str[i] = "^";
+        }
+      });
+
+      logs.push(
+        ` ### (BASE CASE) Last (#${groupIdx}) Group (${groups[groupIdx]}) and has range(${range})\n`
+        + "\tsprings:" + springs.join("")
+        + "/possibility:" + str.join("")
+      );
+      break;
+    case walkEvents.RUN:
+      logs.push(" $ Starting Range:", range);
+      callback();
+      logs.push("- - - - - - - - - - - - - - - - - - - - - ");
+      break;
+  }
+}
+
 function walk(springs, range, groups, groupIdx, path) {
   if (groupIdx === groups.length - 1) {
-    /**LOG*/ logs.push(` ### (BASE CASE) Last (#${groupIdx}) Group (${groups[groupIdx]})  and has range(${range})`);
-    
-    let str = Array(springs.length).fill(" ");
-    let i, start, end;
-    const fullPath = path.split("&");
-    
-    fullPath.forEach(rangeStr => {
-      [ start, end ] = rangeStr.split("-");
-      for (i = parseInt(start); i < parseInt(end) + 1; i++) {
-        str[i] = "^";
-      }
-    });
+    if (endHasDamaged(springs, range[1] + 2)) {
+      return 0;
+    }
 
-    ///**LOG*/ console.log("full path:  ", fullPath);
-    /**LOG*/ console.log("springs:    ", springs.join(""));
-    /**LOG*/ console.log("possibility:", str.join(""));
-    // /**LOG*/ logs.push(springs);
-    // /**LOG*/ logs.push(str);
+    logWalk({ eventType: walkEvents.POSSIBILITY, springs, range, groups, groupIdx, path });
     return 1;
   }
 
@@ -71,16 +124,12 @@ function walk(springs, range, groups, groupIdx, path) {
     const range = new Array(start, end);
 
     if (isPossibleRange(springs, range)) {
-      //console.log("++ dispatching walk for group#", nextGroupIdx+1, "(", nextGroup, ") with range(", range, ") as group idx", nextGroupIdx);
-      /**LOG*/ logs.push(`++ dispatching from #${groupIdx}->#${nextGroupIdx} walk(range=${range}, nextGroupIdx=${nextGroupIdx})`);
+      logWalk({ eventType: walkEvents.DISPATCH, range, groupIdx });
       possibilities += walk(springs, range, groups, nextGroupIdx, path + "&" + range.join("-"));
     }
       
     if (springs[start] === springStates.DAMAGED) {
-      /**LOG*/ logs.push(`++ LAST START FOUND :: at range (${range})`);
       break;
-    } else {
-      /**LOG*/ logs.push(`++ last start not found spring(${springs[start]}) at start idx (${start})`);
     }
   }
         
@@ -102,36 +151,24 @@ function findPossibilityCount(springs, groups) {
     }
   }
   
-  /**LOG*/ logs.push("\n---- found starting ranges ----\n");
-  /**LOG*/ logs.push(
+  logs.push(
     "starting ranges: ",
     possibleStartingRanges.reduce((str, r) => str + `[${r[0]},${r[1]}],`, ""),
   );
   
   let possibilities = 0;
   possibleStartingRanges.forEach(range => {
-    /**LOG*/ logs.push(" $ Starting Range:", range);
-    possibilities += walk(springs, range, groups, 0, range.join("-"));
-    /**LOG*/ logs.push("- - - - - - - - - - - - - - - - - - - - - ");
+    logWalk({
+      eventType: walkEvents.RUN,
+      range,
+      callback: () => possibilities += walk(springs, range, groups, 0, range.join("-")),
+    });
   });
   return possibilities;
 }
 
-var logs = {
-  data: [],
-  print() {
-    this.data.forEach(l => console.log(l));
-  },
-  push(val) {
-    this.data.push(val);
-  },
-  reset() {
-    this.data = [];
-  },
-};
-
 async function part1() {
-  console.log("\n".repeat(10)+"* PART ONE *");
+  logs.push("\n".repeat(10) + "* PART ONE *");
   let groups, springsStr, springs;
   let possibilities = 0;
   let result;
@@ -142,18 +179,14 @@ async function part1() {
       break;
     }
 
-    // Parse line into springs and groups
     [ springsStr, groups ] = line.split(" ");
     springs = springsStr.split("");
     groups = groups.split(",").map(numStr => parseInt(numStr));
-    // Find possibilities for this line
     result = findPossibilityCount(springs, groups);
     possibilities += result;
 
-    // /**LOG*/ logs.push(`Line "${idx++}" ( ${line+" )".padEnd(35, " ")} provided (${result}) possibilities`);
-    /**LOG*/ console.log(`Line "${idx++}" ( ${line+" )".padEnd(35, " ")} provided (${result}) possibilities`);
-   
-    //logs.print();
+    logs.push(`Line "${idx++}" ( ${line+" )".padEnd(35, " ")} provided (${result}) possibilities`);
+    logs.print();
     logs.reset();
   }
   
@@ -161,6 +194,9 @@ async function part1() {
 }
 
 async function main() {
+  if (process.argv.includes("-n")) {
+    logs.disableLogs();
+  }
   const p1Result = await part1();
   /**LOG*/ console.log("\nPart 1 Result:", p1Result);
 }
