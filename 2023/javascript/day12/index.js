@@ -1,64 +1,11 @@
 const fs = require("fs");
 const readline = require("readline");
 
-const logs = {
-  data: [],
-  disabled: false,
-  disableLogs() {
-    this.disabled = true;
-  },
-  print() {
-    if (this.disabled) return;
-    this.data.forEach(l => console.log(l));
-  },
-  push(val) {
-    if (this.disabled) return;
-    this.data.push(val);
-  },
-  reset() {
-    if (this.disabled) return;
-    this.data = [];
-  },
-};
 const springStates = Object.freeze({
   DAMAGED: "#",
   OPERATIONAL: ".",
   UNKNOWN: "?",
 });
-const walkEvents = Object.freeze({
-  DISPATCH: 'dispatch',
-  POSSIBILITY: 'possibility',
-  RUN: 'run',
-});
-
-function logWalk({ eventType, springs, range, groups, groupIdx, path, callback }) {
-  switch (eventType) {
-    case walkEvents.DISPATCH:
-      logs.push(`++ dispatching from #${groupIdx}->#${groupIdx + 1} walk(range=${range}, nextGroupIdx=${groupIdx + 1})`);
-      break;
-    case walkEvents.POSSIBILITY:
-      let str = Array(springs.length).fill(" ");
-      let i, start, end;
-      path.split("&").forEach(rangeStr => {
-        [ start, end ] = rangeStr.split("-");
-        for (i = parseInt(start); i < parseInt(end) + 1; i++) {
-          str[i] = "^";
-        }
-      });
-
-      logs.push(
-        ` ### (BASE CASE) Last (#${groupIdx}) Group (${groups[groupIdx]}) and has range(${range})`
-        + "\n\tsprings:" + springs.join("")
-        + "\n\tpssblty:" + str.join("")
-      );
-      break;
-    case walkEvents.RUN:
-      logs.push(" $ Starting Range:", range);
-      callback();
-      logs.push("- - - - - - - - - - - - - - - - - - - - - ");
-      break;
-  }
-}
 
 async function* getLine() {
   const filename = process.argv.includes("-t") ? "input-test.txt" : "input.txt";
@@ -75,11 +22,8 @@ async function* getLine() {
 }
 
 function isPossibleRange(springs, range) {
-  logs.push(` >>>> Finding [${range[0]}, ${range[1]}] >>>>`);
-  
   for (let cursor = range[0]; cursor < range[1] + 1; cursor++) {
     if (springs[cursor] === springStates.OPERATIONAL) {
-      logs.push(`-!- range (${range}) is INVALID ::  currentStartIdx(${range[0]}) contains OPERATIONAL spring at (${cursor})`);
       return false;
     }
   }
@@ -105,74 +49,44 @@ function endHasDamaged(springs, start) {
 }
 
 function walk(springs, range, groups, groupIdx, path) {
-  if (groupIdx === groups.length - 1) {
-    if (endHasDamaged(springs, range[1] + 2)) {
-      return 0;
-    }
-
-    logWalk({ eventType: walkEvents.POSSIBILITY, springs, range, groups, groupIdx, path });
-    return 1;
+  const isLastGroup = groupIdx === groups.length - 1;
+  
+  if (isLastGroup) {
+    return endHasDamaged(springs, range[1] + 2) ? 0 : 1;
   }
 
-  const nextGroupIdx = groupIdx + 1;
-  const nextGroup = groups[nextGroupIdx];
-  let start = range[1] + 2; // Start with one space gap between last range
-  let end = start + nextGroup - 1;
-  let possibilities = 0;
+  const start = range[1] + 2; // Start with one space gap between last range
+  const end = start + groups[groupIdx + 1] - 1;
+  const newPath = `${path ? `${path}&`: ""}${range.join("-")}`;
 
-  for (; end < springs.length; start++, end++) {
-    const range = new Array(start, end);
-
-    if (isPossibleRange(springs, range)) {
-      logWalk({ eventType: walkEvents.DISPATCH, range, groupIdx });
-      possibilities += walk(springs, range, groups, nextGroupIdx, path + "&" + range.join("-"));
-    }
-      
-    if (springs[start] === springStates.DAMAGED) {
-      break;
-    }
-  }
-        
-  return possibilities;
+  return calcPossibilities(springs, Array(start, end), groups, groupIdx + 1, newPath);
 }
 
-function findPossibilityCount(springs, groups) {
-  const possibleStartingRanges = [];
-  const startingGroup = groups[0];
+function calcPossibilities(springs, range, groups, groupIdx, path) {
+  let start = range[0];
+  let end = range[1];
+  let possibilities = 0;
  
-  for (let i = 0, j = startingGroup - 1; j < springs.length; i++, j++) {
-    const range = Array(i, j);
+  for (; end < springs.length; start++, end++) {
+    const range = Array(start, end);
+
     if (isPossibleRange(springs, range)) {
-      possibleStartingRanges.push(range);
+      const newPath = `${path ? `${path}&`: ""}${range.join("-")}`;
+      possibilities += walk(springs, range, groups, groupIdx, newPath);
     }
 
-    if (springs[i] === springStates.DAMAGED) {
-      break;
+    if (springs[start] === springStates.DAMAGED) {
+      return possibilities;
     }
   }
   
-  logs.push(
-    "starting ranges: ",
-    possibleStartingRanges.reduce((str, r) => str + `[${r[0]},${r[1]}],`, ""),
-  );
-  
-  let possibilities = 0;
-  possibleStartingRanges.forEach(range => {
-    logWalk({
-      eventType: walkEvents.RUN,
-      range,
-      callback: () => possibilities += walk(springs, range, groups, 0, range.join("-")),
-    });
-  });
   return possibilities;
 }
 
-async function part1() {
-  logs.push("\n".repeat(10) + "* PART ONE *");
-  let groups, springsStr, springs;
-  let possibilities = 0;
-  let result;
-  let idx = 1;
+async function run() {
+  let groups, resultOne, resultTwo, springsStr, springs, temp;
+  let possibilitiesOne = 0;
+  let possibilitiesTwo = 0;
   
   for await (const line of getLine()) {
     if (line === null) {
@@ -180,34 +94,47 @@ async function part1() {
     }
 
     [ springsStr, groups ] = line.split(" ");
-    // TESTING PART TWO
-    springsStr = `${springsStr}?${springsStr}`
-    groups = `${groups},${groups}`
-    // - - - - - - - - - - - - - - - - - - - - - - 
     springs = springsStr.split("");
     groups = groups.split(",").map(numStr => parseInt(numStr));
+    const startRange = Array(0, groups[0] - 1);
 
-    result = findPossibilityCount(springs, groups); // Now the result of one of four sections in "unfolded records"
-    console.log("possibilites for a two-section:", result);
-    result = Math.pow(result * 4, 2);
-    console.log("possibilites for a FULL unfolded section:", result);
+    /** Part One **/
+    resultOne = calcPossibilities(springs, startRange, groups, 0, "");
+    possibilitiesOne += resultOne;
+    // console.log("ONE", { resultOne, springs, groups });
 
-    possibilities += result;
-
-    logs.push(`Line "${idx++}" ( ${springsStr + groups +" )".padEnd(35, " ")} provided (${result}) possibilities`);
-    logs.print();
-    logs.reset();
+    /** Part Two **/
+    if (springsStr.endsWith(springStates.DAMAGED)) {
+      // Cannot use additional "?" just use resultOne in all multiplication spots
+      possibilitiesTwo += Math.pow(resultOne, 5);
+    } else {
+      springs = `?${springsStr}`.split("");
+      resultTwo = calcPossibilities(springs, startRange, groups, 0, "");
+      // Swap the additional "?" to the other side and recalculate
+      // -- when the first range cannot change at all?
+      // -- if both ways change original possibility total - which should be used?
+      //      - higher or lower? first way or second (adjusted) way?
+      
+      springs = `${springsStr}?`.split("");
+      temp = calcPossibilities(springs, startRange, groups, 0, "");
+      if (temp > resultTwo) {
+        resultTwo = temp;
+      }
+      possibilitiesTwo += resultOne * Math.pow(resultTwo, 4);
+      // console.log("TWO", { resultTwo, addedPoss: resultOne * Math.pow(resultTwo, 4), springs });
+    }
   }
   
-  return possibilities;
+  return {
+    p1Result: possibilitiesOne,
+    p2Result: possibilitiesTwo,
+  };
 }
 
 async function main() {
-  if (process.argv.includes("-n")) {
-    logs.disableLogs();
-  }
-  const p1Result = await part1();
+  const { p1Result, p2Result } = await run();
   /**LOG*/ console.log("\nPart 1 Result:", p1Result);
+  /**LOG*/ console.log("Part 2 Result:", p2Result);
 }
 
 main();
