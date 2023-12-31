@@ -31,6 +31,35 @@ const walkEvents = Object.freeze({
   RUN: 'run',
 });
 
+function logWalk({ eventType, springs, range, groups, groupIdx, path, callback }) {
+  switch (eventType) {
+    case walkEvents.DISPATCH:
+      logs.push(`++ dispatching from #${groupIdx}->#${groupIdx + 1} walk(range=${range}, nextGroupIdx=${groupIdx + 1})`);
+      break;
+    case walkEvents.POSSIBILITY:
+      let str = Array(springs.length).fill(" ");
+      let i, start, end;
+      path.split("&").forEach(rangeStr => {
+        [ start, end ] = rangeStr.split("-");
+        for (i = parseInt(start); i < parseInt(end) + 1; i++) {
+          str[i] = "^";
+        }
+      });
+
+      logs.push(
+        ` ### (BASE CASE) Last (#${groupIdx}) Group (${groups[groupIdx]}) and has range(${range})`
+        + "\n\tsprings:" + springs.join("")
+        + "\n\tpssblty:" + str.join("")
+      );
+      break;
+    case walkEvents.RUN:
+      logs.push(" $ Starting Range:", range);
+      callback();
+      logs.push("- - - - - - - - - - - - - - - - - - - - - ");
+      break;
+  }
+}
+
 async function* getLine() {
   const filename = process.argv.includes("-t") ? "input-test.txt" : "input.txt";
   const fileStream = fs.createReadStream(filename);
@@ -73,35 +102,6 @@ function endHasDamaged(springs, start) {
   }
 
   return false;
-}
-
-function logWalk({ eventType, springs, range, groups, groupIdx, path, callback }) {
-  switch (eventType) {
-    case walkEvents.DISPATCH:
-      logs.push(`++ dispatching from #${groupIdx}->#${groupIdx + 1} walk(range=${range}, nextGroupIdx=${groupIdx + 1})`);
-      break;
-    case walkEvents.POSSIBILITY:
-      let str = Array(springs.length).fill(" ");
-      let i, start, end;
-      path.split("&").forEach(rangeStr => {
-        [ start, end ] = rangeStr.split("-");
-        for (i = parseInt(start); i < parseInt(end) + 1; i++) {
-          str[i] = "^";
-        }
-      });
-
-      logs.push(
-        ` ### (BASE CASE) Last (#${groupIdx}) Group (${groups[groupIdx]}) and has range(${range})\n`
-        + "\tsprings:" + springs.join("")
-        + "/possibility:" + str.join("")
-      );
-      break;
-    case walkEvents.RUN:
-      logs.push(" $ Starting Range:", range);
-      callback();
-      logs.push("- - - - - - - - - - - - - - - - - - - - - ");
-      break;
-  }
 }
 
 function walk(springs, range, groups, groupIdx, path) {
@@ -180,12 +180,21 @@ async function part1() {
     }
 
     [ springsStr, groups ] = line.split(" ");
+    // TESTING PART TWO
+    springsStr = `${springsStr}?${springsStr}`
+    groups = `${groups},${groups}`
+    // - - - - - - - - - - - - - - - - - - - - - - 
     springs = springsStr.split("");
     groups = groups.split(",").map(numStr => parseInt(numStr));
-    result = findPossibilityCount(springs, groups);
+
+    result = findPossibilityCount(springs, groups); // Now the result of one of four sections in "unfolded records"
+    console.log("possibilites for a two-section:", result);
+    result = Math.pow(result * 4, 2);
+    console.log("possibilites for a FULL unfolded section:", result);
+
     possibilities += result;
 
-    logs.push(`Line "${idx++}" ( ${line+" )".padEnd(35, " ")} provided (${result}) possibilities`);
+    logs.push(`Line "${idx++}" ( ${springsStr + groups +" )".padEnd(35, " ")} provided (${result}) possibilities`);
     logs.print();
     logs.reset();
   }
